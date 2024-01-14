@@ -37,10 +37,10 @@ function App() {
 
   const form = useForm({
     initialValues: {
-      monitor: '',
-      radioOne: '',
-      radioTwo: '',
-      radioThree: ''
+      monitor: ips.monitor,
+      radioOne: ips.radioOne,
+      radioTwo: ips.radioTwo,
+      radioThree: ips.radioThree
     },
     validate: zodResolver(schema)
   })
@@ -56,13 +56,18 @@ function App() {
   const testConnectivity = async () => {
     if (form.validate().hasErrors) return
 
+    const values = form.values
 
+    setIps(values)
 
-    Object.keys(form.values).forEach(async (data) => {
-      const device = data as unknown as keyof typeof form.values
-      const deviceIp = form.values[device]
+    Object.keys(values).forEach(async (data) => {
+      const device = data as unknown as keyof typeof values
+      const deviceIp = values[device] as string
 
-      if (!deviceIp || deviceIp.length === 0) return
+      if (!deviceIp || deviceIp.length === 0) {
+        setConnectionsStatus({ [device]: ConnectionStatus.IDDLE })
+        return
+      }
 
       setConnectionsStatus({ [device]: ConnectionStatus.TESTING })
 
