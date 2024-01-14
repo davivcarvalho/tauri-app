@@ -22,7 +22,7 @@ type StoreProps = {
 
 export const useStore = create(
     persist<StoreProps>(
-        (set, get) => ({
+        (set) => ({
             ips: {
                 monitor: '',
                 radioOne: '',
