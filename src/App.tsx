@@ -70,7 +70,7 @@ function App() {
 
       setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.TESTING }))
 
-      const command = new Command('ping', [deviceIp], { encoding: 'utf-8' })
+      const command = new Command('ping', [deviceIp, '-n', '1'], { encoding: 'utf-8' })
       await command.spawn()
 
       command.stdout.on('data', (data: string) => {
