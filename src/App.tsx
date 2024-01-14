@@ -1,11 +1,13 @@
 import '@mantine/core/styles.css'
-import { Alert, Button, Checkbox, Flex, List, Loader, MantineProvider, TextInput, Title, createTheme } from '@mantine/core'
+import { Alert, Button, Checkbox, Code, Flex, List, Loader, MantineProvider, ScrollArea, TextInput, Title, createTheme } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconAccessPoint, IconAccessPointOff, IconCircleDot, IconInfoCircle } from '@tabler/icons-react'
 import { useState } from 'react'
 import { CustomLoader } from './components/Loader/CustomLoader'
 import { zodResolver } from 'mantine-form-zod-resolver'
 import { z } from 'zod'
+import { sendNotification } from '@tauri-apps/api/notification'
+import { Command } from '@tauri-apps/api/shell'
 
 const theme = createTheme({
   components: {
@@ -20,21 +22,22 @@ const theme = createTheme({
 enum ConnectionStatus { "IDDLE", 'SUCCESS', "FAIL", "TESTING" }
 
 const schema = z.object({
-  monitorIp: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal('')),
-  radioOneIp: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal('')),
-  radioTwoIp: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal('')),
-  radioThreeIp: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal(''))
+  monitor: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal('')),
+  radioOne: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal('')),
+  radioTwo: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal('')),
+  radioThree: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal(''))
 });
 
 
 function App() {
-  const icon = <IconInfoCircle />;
-
-  const [monitorConnStt, setMonitorConnStt] = useState<ConnectionStatus>(ConnectionStatus.IDDLE)
-  const [radioOneConnStt, setRadioOneConnStt] = useState<ConnectionStatus>(ConnectionStatus.IDDLE)
-  const [radioTwoConnStt, setRadioTwoConnStt] = useState<ConnectionStatus>(ConnectionStatus.IDDLE)
-  const [radioThreeConnStt, setRadioThreeConnStt] = useState<ConnectionStatus>(ConnectionStatus.IDDLE)
+  const [connectionsStatus, setConnectionsStatus] = useState({
+    monitor: ConnectionStatus.IDDLE,
+    radioOne: ConnectionStatus.IDDLE,
+    radioTwo: ConnectionStatus.IDDLE,
+    radioThree: ConnectionStatus.IDDLE
+  })
   const [directConn, setDirectConn] = useState(false)
+  const [log, setLog] = useState<String[]>([])
 
   const form = useForm({
     initialValues: {
@@ -54,32 +57,41 @@ function App() {
     return <IconCircleDot size={13} />
   }
 
-
-  const testConnectivity = () => {
+  const testConnectivity = async () => {
     if (form.validate().hasErrors) return
 
-    setMonitorConnStt(ConnectionStatus.TESTING)
-    if (!directConn) {
-      setRadioOneConnStt(ConnectionStatus.TESTING)
-      setRadioTwoConnStt(ConnectionStatus.TESTING)
-      setRadioThreeConnStt(ConnectionStatus.TESTING)
-    }
 
 
+    Object.keys(form.values).forEach(async (data) => {
+      const device = data as unknown as keyof typeof form.values
+      const deviceIp = form.values[device]
 
-    setTimeout(() => {
+      if (!deviceIp || deviceIp.length === 0) return
 
-      setMonitorConnStt(ConnectionStatus.SUCCESS)
-      if (!directConn) {
-        setRadioOneConnStt(ConnectionStatus.FAIL)
-        setRadioTwoConnStt(ConnectionStatus.SUCCESS)
-        setRadioThreeConnStt(ConnectionStatus.FAIL)
-      }
+      setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.TESTING }))
 
-    }, 3000)
+      const command = new Command('ping', [deviceIp], { encoding: 'utf-8' })
+      await command.spawn()
+
+      command.stdout.on('data', (data: string) => {
+        setLog(log => [...log, `${device}: ${data}`])
+
+        if (data.includes(deviceIp) && data.includes('tempo')) {
+          setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.SUCCESS }))
+        }
+
+        if (data.includes('inac') || data.includes('Esgotado') || data.includes('limite')) {
+          setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.FAIL }))
+        }
+
+      })
+      command.on('error', data => {
+        setLog(log => [...log, `${device}: ${data}`])
+        setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.FAIL }))
+      })
+
+    })
   }
-
-
 
   return (
     <MantineProvider theme={theme}>
@@ -89,7 +101,7 @@ function App() {
         direction='column'
       >
         <Title size={20} > SCM Ping Tool </Title>
-        <Alert variant="light" color="blue" title="Nota" icon={icon} mt={20}>
+        <Alert variant="light" color="blue" title="Nota" icon={<IconInfoCircle />} mt={20}>
           Este aplicativo permite testar a conectividade entre o computador e o monitor SCM Sarclad.
           <br />
           <br />
@@ -111,8 +123,8 @@ function App() {
             <TextInput
               mt={15}
               description="Insira o IP do monitor SCM Sarclad "
-              {...form.getInputProps('monitorIp')}
-              rightSection={getStatusIcon(monitorConnStt)}
+              {...form.getInputProps('monitor')}
+              rightSection={getStatusIcon(connectionsStatus.monitor)}
             />
           </Flex>
           <Flex direction={'column'}
@@ -123,24 +135,24 @@ function App() {
               disabled={directConn}
               mt={15}
               description="Insira o IP do radio 1"
-              rightSection={getStatusIcon(radioOneConnStt)}
+              rightSection={getStatusIcon(connectionsStatus.radioOne)}
 
-              {...form.getInputProps('radioOneIp')}
+              {...form.getInputProps('radioOne')}
             />
             <TextInput
               disabled={directConn}
               mt={15}
               description="Insira o IP do radio 2"
-              {...form.getInputProps('radioTwoIp')}
-              rightSection={getStatusIcon(radioTwoConnStt)}
+              {...form.getInputProps('radioTwo')}
+              rightSection={getStatusIcon(connectionsStatus.radioTwo)}
             />
 
             <TextInput
               disabled={directConn}
               mt={15}
               description="Insira o IP do radio 3"
-              {...form.getInputProps('radioThreeIp')}
-              rightSection={getStatusIcon(radioThreeConnStt)}
+              {...form.getInputProps('radioThree')}
+              rightSection={getStatusIcon(connectionsStatus.radioThree)}
             />
 
             <Checkbox
@@ -170,6 +182,13 @@ function App() {
         </Flex>
 
       </Flex>
+      <Flex direction={'column'} p={10}>
+        <Title size={15} >Log</Title>
+        <ScrollArea mt={10} h={150}>
+          <Code block>{log}</Code>
+        </ScrollArea>
+      </Flex>
+
     </MantineProvider>
   );
 }
