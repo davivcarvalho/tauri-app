@@ -6,8 +6,8 @@ import { useState } from 'react'
 import { CustomLoader } from './components/Loader/CustomLoader'
 import { zodResolver } from 'mantine-form-zod-resolver'
 import { z } from 'zod'
-import { sendNotification } from '@tauri-apps/api/notification'
 import { Command } from '@tauri-apps/api/shell'
+import { useStore } from './store'
 
 const theme = createTheme({
   components: {
@@ -30,21 +30,17 @@ const schema = z.object({
 
 
 function App() {
-  const [connectionsStatus, setConnectionsStatus] = useState({
-    monitor: ConnectionStatus.IDDLE,
-    radioOne: ConnectionStatus.IDDLE,
-    radioTwo: ConnectionStatus.IDDLE,
-    radioThree: ConnectionStatus.IDDLE
-  })
+  const { ips, setIps, connectionsStatus, setConnectionsStatus } = useStore()
+
   const [directConn, setDirectConn] = useState(false)
   const [log, setLog] = useState<String[]>([])
 
   const form = useForm({
     initialValues: {
-      monitorIp: '',
-      radioOneIp: '',
-      radioTwoIp: '',
-      radioThreeIp: ''
+      monitor: '',
+      radioOne: '',
+      radioTwo: '',
+      radioThree: ''
     },
     validate: zodResolver(schema)
   })
@@ -68,7 +64,7 @@ function App() {
 
       if (!deviceIp || deviceIp.length === 0) return
 
-      setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.TESTING }))
+      setConnectionsStatus({ [device]: ConnectionStatus.TESTING })
 
       const command = new Command('ping', [deviceIp, '-n', '1'], { encoding: 'utf-8' })
       await command.spawn()
@@ -77,17 +73,17 @@ function App() {
         setLog(log => [...log, `${device}: ${data}`])
 
         if (data.includes(deviceIp) && data.includes('tempo')) {
-          setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.SUCCESS }))
+          setConnectionsStatus({ [device]: ConnectionStatus.SUCCESS })
         }
 
         if (data.includes('inac') || data.includes('Esgotado') || data.includes('limite')) {
-          setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.FAIL }))
+          setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
         }
 
       })
       command.on('error', data => {
         setLog(log => [...log, `${device}: ${data}`])
-        setConnectionsStatus(old => ({ ...old, [device]: ConnectionStatus.FAIL }))
+        setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
       })
 
     })
@@ -136,7 +132,6 @@ function App() {
               mt={15}
               description="Insira o IP do radio 1"
               rightSection={getStatusIcon(connectionsStatus.radioOne)}
-
               {...form.getInputProps('radioOne')}
             />
             <TextInput
@@ -185,7 +180,13 @@ function App() {
       <Flex direction={'column'} p={10}>
         <Title size={15} >Log</Title>
         <ScrollArea mt={10} h={150}>
-          <Code block>{log}</Code>
+          <Code block>
+            {JSON.stringify(connectionsStatus)}
+            <br />
+            {JSON.stringify(ips)}
+            <br />
+            {log}
+          </Code>
         </ScrollArea>
       </Flex>
 

@@ -13,12 +13,14 @@
     "@mantine/core": "^7.4.1",
     "@mantine/form": "^7.4.1",
     "@mantine/hooks": "^7.4.1",
+    "@reduxjs/toolkit": "^2.0.1",
     "@tabler/icons-react": "^2.46.0",
     "@tauri-apps/api": "^1.5.2",
     "mantine-form-zod-resolver": "^1.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.8",
