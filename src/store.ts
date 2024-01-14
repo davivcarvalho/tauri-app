@@ -18,6 +18,8 @@ type StoreProps = {
         radioThree: ConnectionStatus
     }
     setConnectionsStatus: (data: Partial<StoreProps['connectionsStatus']>) => void
+    directConnection: boolean
+    setDirectConnection: (data: StoreProps['directConnection']) => void
 }
 
 export const useStore = create(
@@ -36,7 +38,9 @@ export const useStore = create(
                 radioTwo: ConnectionStatus.IDDLE,
                 radioThree: ConnectionStatus.IDDLE
             },
-            setConnectionsStatus: (data: Partial<StoreProps['connectionsStatus']>) => set(state => ({ connectionsStatus: { ...state.connectionsStatus, ...data } }))
+            setConnectionsStatus: (data: Partial<StoreProps['connectionsStatus']>) => set(state => ({ connectionsStatus: { ...state.connectionsStatus, ...data } })),
+            directConnection: false,
+            setDirectConnection: (data) => set({ directConnection: data })
         }),
         {
             name: 'scm-ping-storage', // name of the item in the storage (must be unique)

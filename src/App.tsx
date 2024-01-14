@@ -2,7 +2,7 @@ import '@mantine/core/styles.css'
 import { Alert, Button, Checkbox, Code, Flex, List, Loader, MantineProvider, ScrollArea, TextInput, Title, createTheme } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconAccessPoint, IconAccessPointOff, IconCircleDot, IconInfoCircle } from '@tabler/icons-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CustomLoader } from './components/Loader/CustomLoader'
 import { zodResolver } from 'mantine-form-zod-resolver'
 import { z } from 'zod'
@@ -30,9 +30,7 @@ const schema = z.object({
 
 
 function App() {
-  const { ips, setIps, connectionsStatus, setConnectionsStatus } = useStore()
-
-  const [directConn, setDirectConn] = useState(false)
+  const { ips, setIps, connectionsStatus, setConnectionsStatus, directConnection, setDirectConnection } = useStore()
   const [log, setLog] = useState<String[]>([])
 
   const form = useForm({
@@ -64,6 +62,8 @@ function App() {
       const device = data as unknown as keyof typeof values
       const deviceIp = values[device] as string
 
+      if (directConnection && device !== 'monitor') return
+
       if (!deviceIp || deviceIp.length === 0) {
         setConnectionsStatus({ [device]: ConnectionStatus.IDDLE })
         return
@@ -93,6 +93,21 @@ function App() {
 
     })
   }
+
+  const onSetDirectConnection = () => {
+    if (directConnection) {
+      setConnectionsStatus({
+        radioOne: ConnectionStatus.IDDLE,
+        radioTwo: ConnectionStatus.IDDLE,
+        radioThree: ConnectionStatus.IDDLE
+      })
+    }
+    setDirectConnection(!directConnection)
+  }
+
+  useEffect(() => {
+    testConnectivity()
+  }, [])
 
   return (
     <MantineProvider theme={theme}>
@@ -133,14 +148,14 @@ function App() {
 
             <Title size={13}>Radios WiFi</Title>
             <TextInput
-              disabled={directConn}
+              disabled={directConnection}
               mt={15}
               description="Insira o IP do radio 1"
               rightSection={getStatusIcon(connectionsStatus.radioOne)}
               {...form.getInputProps('radioOne')}
             />
             <TextInput
-              disabled={directConn}
+              disabled={directConnection}
               mt={15}
               description="Insira o IP do radio 2"
               {...form.getInputProps('radioTwo')}
@@ -148,7 +163,7 @@ function App() {
             />
 
             <TextInput
-              disabled={directConn}
+              disabled={directConnection}
               mt={15}
               description="Insira o IP do radio 3"
               {...form.getInputProps('radioThree')}
@@ -158,8 +173,8 @@ function App() {
             <Checkbox
               mt={20}
               label={"Conexão direta ?"}
-              checked={directConn}
-              onChange={() => setDirectConn(value => !value)}
+              checked={directConnection}
+              onChange={onSetDirectConnection}
             />
 
           </Flex>
