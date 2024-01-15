@@ -7,8 +7,9 @@ import { CustomLoader } from './components/Loader/CustomLoader'
 import { zodResolver } from 'mantine-form-zod-resolver'
 import { z } from 'zod'
 import { Command } from '@tauri-apps/api/shell'
-import { useStore } from './store'
+import { usePersistedStore, useStore } from './store'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification'
+import { invoke } from '@tauri-apps/api'
 
 const theme = createTheme({
   components: {
@@ -31,7 +32,8 @@ const schema = z.object({
 
 
 function App() {
-  const { ips, setIps, connectionsStatus, setConnectionsStatus, directConnection, setDirectConnection } = useStore()
+  const { ips, setIps, directConnection, setDirectConnection } = usePersistedStore()
+  const { setConnectionsStatus, connectionsStatus } = useStore()
   const [log, setLog] = useState<String[]>([])
   const [isChanged, setIsChanged] = useState(false)
   const [timeoutRef, setTimeoutRef] = useState<number[]>([])
@@ -96,7 +98,7 @@ function App() {
       const command = new Command('ping', [deviceIp, '-n', '1'], { encoding: 'utf-8' })
       await command.spawn()
 
-      command.stdout.on('data', (data: string) => {
+      command.stdout.on('data', async (data: string) => {
         setLog(log => [...log, `${device}: ${data}`])
 
         // success ping case
@@ -104,6 +106,7 @@ function App() {
           // send notification if monitor conn is change from fail to success
           if (device === 'monitor') startInterval(5 * 60000)
           if (oldConnectionStatus != ConnectionStatus.SUCCESS && device === 'monitor') {
+            invoke('set_success_tray')
             sendNotification(`Monitor SCM Sarclad está conectado a rede.`)
           }
           setConnectionsStatus({ [device]: ConnectionStatus.SUCCESS })
@@ -115,6 +118,7 @@ function App() {
           if (device === 'monitor') startInterval(10000)
           if (oldConnectionStatus != ConnectionStatus.FAIL && device === 'monitor') {
             sendNotification(`Monitor SCM Sarclad não está conectado na rede.`)
+            invoke('set_fail_tray')
           }
           setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
         }
@@ -179,7 +183,7 @@ function App() {
         permissionGranted = permission === 'granted';
       }
 
-      await testConnectivity(ips)
+      startInterval(1000)
     })()
 
     return () => {
