@@ -63,21 +63,24 @@ function App() {
 
   const startInterval = (time: number) => {
     if (timeoutRef.length > 0) stopInterval()
-    const timeRef = setTimeout(testConnectivity, time)
+    const timeRef = setTimeout(() => testConnectivity(ips), time)
     setTimeoutRef(old => [...old, timeRef])
   }
 
-  const testConnectivity = async () => {
+  const testConnectivity = async (values: typeof ips) => {
     stopInterval()
 
     setLog(log => [...log, `${new Date().toLocaleString()} Starting connectivity check \n`])
 
-    Object.keys(ips).forEach(async (data) => {
-      const device = data as unknown as keyof typeof ips
-      const deviceIp = ips[device] as string
+    Object.keys(values).forEach(async (data) => {
+      const device = data as unknown as keyof typeof values
+      const deviceIp = values[device] as string
 
       // skip if directConn is setted and device is a radio
-      if (directConnection && device !== 'monitor') return
+      if (directConnection && device !== 'monitor') {
+        setLog(log => [...log, `${new Date().toLocaleString()} Skipped ${device} due direct connection \n`])
+        return
+      }
 
       // skip if ip is a blank string
       if (!deviceIp || deviceIp.length === 0) {
@@ -100,7 +103,7 @@ function App() {
         if (data.includes(deviceIp) && data.includes('tempo')) {
           // send notification if monitor conn is change from fail to success
           if (device === 'monitor') startInterval(5 * 60000)
-          if (oldConnectionStatus == ConnectionStatus.FAIL && device === 'monitor') {
+          if (oldConnectionStatus != ConnectionStatus.SUCCESS && device === 'monitor') {
             sendNotification(`Monitor SCM Sarclad está conectado a rede.`)
           }
           setConnectionsStatus({ [device]: ConnectionStatus.SUCCESS })
@@ -110,7 +113,7 @@ function App() {
         if (data.includes('inac') || data.includes('Esgotado') || data.includes('limite')) {
           // send notification if monitor conn is change from success to fail
           if (device === 'monitor') startInterval(10000)
-          if (oldConnectionStatus == ConnectionStatus.IDDLE && device === 'monitor') {
+          if (oldConnectionStatus != ConnectionStatus.FAIL && device === 'monitor') {
             sendNotification(`Monitor SCM Sarclad não está conectado na rede.`)
           }
           setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
@@ -137,13 +140,12 @@ function App() {
 
   const handleFormChange = (field: keyof typeof form.values) => {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
+      setIsChanged(true)
+      stopInterval()
+
+
       form.setFieldValue(field, event.target.value)
       setConnectionsStatus({ [field]: ConnectionStatus.IDDLE })
-
-      if (form.isDirty()) {
-        setIsChanged(true)
-        stopInterval()
-      }
     }
   }
 
@@ -155,10 +157,10 @@ function App() {
       radioThree: ips.radioThree
     })
     setIsChanged(false)
-    testConnectivity()
+    testConnectivity(form.values)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (form.validate().hasErrors) {
       setLog(log => [...log, `Test stoped due validation errors \n`])
       return
@@ -166,7 +168,7 @@ function App() {
     setIps(form.values)
     setIsChanged(false)
 
-    testConnectivity()
+    await testConnectivity(form.values)
   }
 
   useEffect(() => {
@@ -177,7 +179,7 @@ function App() {
         permissionGranted = permission === 'granted';
       }
 
-      testConnectivity()
+      await testConnectivity(ips)
     })()
 
     return () => {
