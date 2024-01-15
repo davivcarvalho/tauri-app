@@ -5,10 +5,10 @@ export enum ConnectionStatus { "IDDLE", 'SUCCESS', "FAIL", "TESTING" }
 
 type StoreProps = {
     ips: {
-        monitor: ''
-        radioOne: ''
-        radioTwo: ''
-        radioThree: ''
+        monitor: string
+        radioOne: string
+        radioTwo: string
+        radioThree: string
     },
     setIps: (data: Partial<StoreProps['ips']>) => void
     connectionsStatus: {

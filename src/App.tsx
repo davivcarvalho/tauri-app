@@ -8,6 +8,7 @@ import { zodResolver } from 'mantine-form-zod-resolver'
 import { z } from 'zod'
 import { Command } from '@tauri-apps/api/shell'
 import { useStore } from './store'
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification'
 
 const theme = createTheme({
   components: {
@@ -32,7 +33,8 @@ const schema = z.object({
 function App() {
   const { ips, setIps, connectionsStatus, setConnectionsStatus, directConnection, setDirectConnection } = useStore()
   const [log, setLog] = useState<String[]>([])
-
+  const [isChanged, setIsChanged] = useState(false)
+  const [timeoutRef, setTimeoutRef] = useState<number[]>([])
   const form = useForm({
     initialValues: {
       monitor: ips.monitor,
@@ -43,6 +45,7 @@ function App() {
     validate: zodResolver(schema)
   })
 
+
   const getStatusIcon = (status: ConnectionStatus) => {
     if (status === ConnectionStatus.FAIL) return <IconAccessPointOff color='#F06418' />
     if (status === ConnectionStatus.SUCCESS) return <IconAccessPoint color='#2BDD66' />
@@ -51,23 +54,39 @@ function App() {
     return <IconCircleDot size={13} />
   }
 
+  const stopInterval = () => {
+    for (var i = 0; i < timeoutRef.length; i++) {
+      clearTimeout(timeoutRef[i]);
+    }
+    setTimeoutRef([])
+  }
+
+  const startInterval = (time: number) => {
+    if (timeoutRef.length > 0) stopInterval()
+    const timeRef = setTimeout(testConnectivity, time)
+    setTimeoutRef(old => [...old, timeRef])
+  }
+
   const testConnectivity = async () => {
-    if (form.validate().hasErrors) return
+    stopInterval()
 
-    const values = form.values
+    setLog(log => [...log, `${new Date().toLocaleString()} Starting connectivity check \n`])
 
-    setIps(values)
+    Object.keys(ips).forEach(async (data) => {
+      const device = data as unknown as keyof typeof ips
+      const deviceIp = ips[device] as string
 
-    Object.keys(values).forEach(async (data) => {
-      const device = data as unknown as keyof typeof values
-      const deviceIp = values[device] as string
-
+      // skip if directConn is setted and device is a radio
       if (directConnection && device !== 'monitor') return
 
+      // skip if ip is a blank string
       if (!deviceIp || deviceIp.length === 0) {
         setConnectionsStatus({ [device]: ConnectionStatus.IDDLE })
         return
       }
+
+      // starting connection test
+      const oldConnectionStatus = connectionsStatus[device]
 
       setConnectionsStatus({ [device]: ConnectionStatus.TESTING })
 
@@ -77,20 +96,31 @@ function App() {
       command.stdout.on('data', (data: string) => {
         setLog(log => [...log, `${device}: ${data}`])
 
+        // success ping case
         if (data.includes(deviceIp) && data.includes('tempo')) {
+          // send notification if monitor conn is change from fail to success
+          if (device === 'monitor') startInterval(5 * 60000)
+          if (oldConnectionStatus == ConnectionStatus.FAIL && device === 'monitor') {
+            sendNotification(`Monitor SCM Sarclad está conectado a rede.`)
+          }
           setConnectionsStatus({ [device]: ConnectionStatus.SUCCESS })
         }
 
+        // fail ping case
         if (data.includes('inac') || data.includes('Esgotado') || data.includes('limite')) {
+          // send notification if monitor conn is change from success to fail
+          if (device === 'monitor') startInterval(10000)
+          if (oldConnectionStatus == ConnectionStatus.IDDLE && device === 'monitor') {
+            sendNotification(`Monitor SCM Sarclad não está conectado na rede.`)
+          }
           setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
         }
-
       })
+
       command.on('error', data => {
         setLog(log => [...log, `${device}: ${data}`])
         setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
       })
-
     })
   }
 
@@ -105,8 +135,54 @@ function App() {
     setDirectConnection(!directConnection)
   }
 
-  useEffect(() => {
+  const handleFormChange = (field: keyof typeof form.values) => {
+    return (event: React.ChangeEvent<HTMLInputElement>) => {
+      form.setFieldValue(field, event.target.value)
+      setConnectionsStatus({ [field]: ConnectionStatus.IDDLE })
+
+      if (form.isDirty()) {
+        setIsChanged(true)
+        stopInterval()
+      }
+    }
+  }
+
+  const handleReset = () => {
+    form.setValues({
+      monitor: ips.monitor,
+      radioOne: ips.radioOne,
+      radioTwo: ips.radioTwo,
+      radioThree: ips.radioThree
+    })
+    setIsChanged(false)
     testConnectivity()
+  }
+
+  const handleSave = () => {
+    if (form.validate().hasErrors) {
+      setLog(log => [...log, `Test stoped due validation errors \n`])
+      return
+    }
+    setIps(form.values)
+    setIsChanged(false)
+
+    testConnectivity()
+  }
+
+  useEffect(() => {
+    (async () => {
+      let permissionGranted = await isPermissionGranted();
+      if (!permissionGranted) {
+        const permission = await requestPermission();
+        permissionGranted = permission === 'granted';
+      }
+
+      testConnectivity()
+    })()
+
+    return () => {
+      stopInterval()
+    }
   }, [])
 
   return (
@@ -141,6 +217,7 @@ function App() {
               description="Insira o IP do monitor SCM Sarclad "
               {...form.getInputProps('monitor')}
               rightSection={getStatusIcon(connectionsStatus.monitor)}
+              onChange={handleFormChange('monitor')}
             />
           </Flex>
           <Flex direction={'column'}
@@ -153,6 +230,7 @@ function App() {
               description="Insira o IP do radio 1"
               rightSection={getStatusIcon(connectionsStatus.radioOne)}
               {...form.getInputProps('radioOne')}
+              onChange={handleFormChange('radioOne')}
             />
             <TextInput
               disabled={directConnection}
@@ -160,6 +238,7 @@ function App() {
               description="Insira o IP do radio 2"
               {...form.getInputProps('radioTwo')}
               rightSection={getStatusIcon(connectionsStatus.radioTwo)}
+              onChange={handleFormChange('radioTwo')}
             />
 
             <TextInput
@@ -175,6 +254,7 @@ function App() {
               label={"Conexão direta ?"}
               checked={directConnection}
               onChange={onSetDirectConnection}
+
             />
 
           </Flex>
@@ -188,17 +268,32 @@ function App() {
         >
 
           <Button
-            onClick={testConnectivity}
-
+            onClick={handleSave}
             w={200}
+            disabled={!isChanged}
           >
-            Testar Conectividade
+            Salvar
+          </Button>
+
+          <Button
+            onClick={handleReset}
+            w={80}
+            ml={20}
+            variant='outline'
+          >
+            Reset
           </Button>
         </Flex>
 
       </Flex>
       <Flex direction={'column'} p={10}>
-        <Title size={15} >Log</Title>
+        <Flex align={'center'} >
+          <Title size={15} mr={10}>
+            Log
+          </Title>
+          {timeoutRef.length > 0 ? <Loader color="blue" type="bars" size={8} /> : null}
+        </Flex>
+
         <ScrollArea mt={10} h={150}>
           <Code block>
             {JSON.stringify(connectionsStatus)}
