@@ -206,12 +206,13 @@ function App() {
           </List>
         </Alert>
         <Flex
-          pt={40}
           justify={'space-evenly'}
           direction={'row'}
+          wrap={'wrap'}
         >
           <Flex
             direction={'column'}
+            pt={30}
           >
             <Title size={13}>Monitor</Title>
             <TextInput
@@ -223,10 +224,12 @@ function App() {
             />
           </Flex>
           <Flex direction={'column'}
+            pt={30}
           >
 
             <Title size={13}>Radios WiFi</Title>
             <TextInput
+
               disabled={directConnection}
               mt={15}
               description="Insira o IP do radio 1"
@@ -264,9 +267,11 @@ function App() {
         </Flex>
 
         <Flex
-          mt={55}
           justify={'center'}
           align={'center'}
+          wrap={'wrap'}
+          mt={40}
+          gap={20}
         >
 
           <Button
@@ -280,7 +285,6 @@ function App() {
           <Button
             onClick={handleReset}
             w={80}
-            ml={20}
             variant='outline'
           >
             Reset
@@ -296,7 +300,7 @@ function App() {
           {timeoutRef.length > 0 ? <Loader color="blue" type="bars" size={8} /> : null}
         </Flex>
 
-        <ScrollArea mt={10} h={150}>
+        <ScrollArea mt={10} h={200}>
           <Code block>
             {JSON.stringify(connectionsStatus)}
             <br />
