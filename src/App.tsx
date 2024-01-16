@@ -63,9 +63,9 @@ function App() {
     setTimeoutRef([])
   }
 
-  const startInterval = (time: number) => {
+  const startInterval = (time: number, values: typeof ips) => {
     if (timeoutRef.length > 0) stopInterval()
-    const timeRef = setTimeout(() => testConnectivity(ips), time)
+    const timeRef = setTimeout(() => testConnectivity(values), time)
     setTimeoutRef(old => [...old, timeRef])
   }
 
@@ -74,7 +74,10 @@ function App() {
 
     setLog(log => [...log, `${new Date().toLocaleString()} Starting connectivity check \n`])
 
-    Object.keys(values).forEach(async (data) => {
+    const promises = Object.keys(values).map((data) => new Promise<void>((resolve, reject) => {
+
+
+
       const device = data as unknown as keyof typeof values
       const deviceIp = values[device] as string
 
@@ -96,7 +99,7 @@ function App() {
       setConnectionsStatus({ [device]: ConnectionStatus.TESTING })
 
       const command = new Command('ping', [deviceIp, '-n', '1'], { encoding: 'utf-8' })
-      await command.spawn()
+      command.spawn()
 
       command.stdout.on('data', async (data: string) => {
         setLog(log => [...log, `${device}: ${data}`])
@@ -104,31 +107,36 @@ function App() {
         // success ping case
         if (data.includes(deviceIp) && data.includes('tempo')) {
           // send notification if monitor conn is change from fail to success
-          if (device === 'monitor') startInterval(5 * 60000)
+
           if (oldConnectionStatus != ConnectionStatus.SUCCESS && device === 'monitor') {
-            invoke('set_success_tray')
+            await invoke('set_success_tray')
             sendNotification(`Monitor SCM Sarclad está conectado a rede.`)
           }
           setConnectionsStatus({ [device]: ConnectionStatus.SUCCESS })
+          if (device === 'monitor') startInterval(5 * 60000, values)
+          resolve()
         }
 
         // fail ping case
         if (data.includes('inac') || data.includes('Esgotado') || data.includes('limite')) {
           // send notification if monitor conn is change from success to fail
-          if (device === 'monitor') startInterval(10000)
           if (oldConnectionStatus != ConnectionStatus.FAIL && device === 'monitor') {
-            sendNotification(`Monitor SCM Sarclad não está conectado na rede.`)
-            invoke('set_fail_tray')
+            await invoke('set_fail_tray')
           }
           setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
+          if (device === 'monitor') startInterval(10000, values)
+          resolve()
         }
       })
 
       command.on('error', data => {
         setLog(log => [...log, `${device}: ${data}`])
         setConnectionsStatus({ [device]: ConnectionStatus.FAIL })
+        reject()
       })
-    })
+    }))
+
+    await Promise.all(promises)
   }
 
   const onSetDirectConnection = () => {
@@ -183,7 +191,7 @@ function App() {
         permissionGranted = permission === 'granted';
       }
 
-      startInterval(1000)
+      startInterval(1000, ips)
     })()
 
     return () => {
@@ -220,6 +228,7 @@ function App() {
           >
             <Title size={13}>Monitor</Title>
             <TextInput
+              disabled={connectionsStatus.monitor === ConnectionStatus.TESTING}
               mt={15}
               description="Insira o IP do monitor SCM Sarclad "
               {...form.getInputProps('monitor')}
@@ -233,8 +242,7 @@ function App() {
 
             <Title size={13}>Radios WiFi</Title>
             <TextInput
-
-              disabled={directConnection}
+              disabled={directConnection || connectionsStatus.radioOne === ConnectionStatus.TESTING}
               mt={15}
               description="Insira o IP do radio 1"
               rightSection={getStatusIcon(connectionsStatus.radioOne)}
@@ -242,7 +250,7 @@ function App() {
               onChange={handleFormChange('radioOne')}
             />
             <TextInput
-              disabled={directConnection}
+              disabled={directConnection || connectionsStatus.radioTwo === ConnectionStatus.TESTING}
               mt={15}
               description="Insira o IP do radio 2"
               {...form.getInputProps('radioTwo')}
@@ -251,11 +259,12 @@ function App() {
             />
 
             <TextInput
-              disabled={directConnection}
+              disabled={directConnection || connectionsStatus.radioThree === ConnectionStatus.TESTING}
               mt={15}
               description="Insira o IP do radio 3"
               {...form.getInputProps('radioThree')}
               rightSection={getStatusIcon(connectionsStatus.radioThree)}
+              onChange={handleFormChange('radioThree')}
             />
 
             <Checkbox
@@ -306,7 +315,7 @@ function App() {
 
         <ScrollArea mt={10} h={200}>
           <Code block>
-            {JSON.stringify(connectionsStatus)}
+            {JSON.stringify(connectionsStatus)} || {JSON.stringify(timeoutRef)}
             <br />
             {JSON.stringify(ips)}
             <br />
