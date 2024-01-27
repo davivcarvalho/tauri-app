@@ -1,26 +1,11 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod tray;
+
 use tauri::Manager;
 use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu};
+use tray::{set_success_tray, set_fail_tray};
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-#[tauri::command]
-fn set_success_tray(app: tauri::AppHandle) {
-    app.tray_handle()
-        .set_icon(tauri::Icon::Raw(
-            include_bytes!("../icons/access-point.png").to_vec(),
-        ))
-        .unwrap();
-}
-
-#[tauri::command]
-fn set_fail_tray(app: tauri::AppHandle) {
-    app.tray_handle()
-        .set_icon(tauri::Icon::Raw(
-            include_bytes!("../icons/access-point-off.png").to_vec(),
-        ))
-        .unwrap();
-}
 
 fn main() {
     let quit = CustomMenuItem::new("quit".to_string(), "Fechar");
