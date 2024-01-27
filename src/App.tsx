@@ -7,7 +7,7 @@ import { CustomLoader } from './components/Loader/CustomLoader'
 import { zodResolver } from 'mantine-form-zod-resolver'
 import { z } from 'zod'
 import { Command } from '@tauri-apps/api/shell'
-import { usePersistedStore, useStore } from './store'
+import { ConnectionStatus, usePersistedStore, useStore } from './store'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification'
 import { invoke } from '@tauri-apps/api'
 
@@ -21,7 +21,6 @@ const theme = createTheme({
     }),
   },
 })
-enum ConnectionStatus { "IDDLE", 'SUCCESS', "FAIL", "TESTING" }
 
 const schema = z.object({
   monitor: z.string().ip({ version: 'v4', message: 'Endereço de IP inválido' }).optional().or(z.literal('')),
@@ -89,7 +88,7 @@ function App() {
 
       // skip if ip is a blank string
       if (!deviceIp || deviceIp.length === 0) {
-        setConnectionsStatus({ [device]: ConnectionStatus.IDDLE })
+        setConnectionsStatus({ [device]: ConnectionStatus.IDLE })
         return
       }
 
@@ -142,9 +141,9 @@ function App() {
   const onSetDirectConnection = () => {
     if (directConnection) {
       setConnectionsStatus({
-        radioOne: ConnectionStatus.IDDLE,
-        radioTwo: ConnectionStatus.IDDLE,
-        radioThree: ConnectionStatus.IDDLE
+        radioOne: ConnectionStatus.IDLE,
+        radioTwo: ConnectionStatus.IDLE,
+        radioThree: ConnectionStatus.IDLE
       })
     }
     setDirectConnection(!directConnection)
@@ -157,7 +156,7 @@ function App() {
 
 
       form.setFieldValue(field, event.target.value)
-      setConnectionsStatus({ [field]: ConnectionStatus.IDDLE })
+      setConnectionsStatus({ [field]: ConnectionStatus.IDLE})
     }
   }
 
@@ -200,7 +199,7 @@ function App() {
   }, [])
 
   return (
-    <MantineProvider theme={theme}>
+    <MantineProvider theme={theme} defaultColorScheme='dark'>
       <Flex
         p={10}
         pt={30}

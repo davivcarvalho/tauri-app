@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export enum ConnectionStatus { "IDDLE", 'SUCCESS', "FAIL", "TESTING" }
+export enum ConnectionStatus { "IDLE", 'SUCCESS', "FAIL", "TESTING" }
 
 type PersistedStoreProps = {
     ips: {
@@ -33,10 +33,10 @@ export const usePersistedStore = create(
             },
             setIps: (data: Partial<PersistedStoreProps['ips']>) => set(state => ({ ips: { ...state.ips, ...data } })),
             connectionsStatus: {
-                monitor: ConnectionStatus.IDDLE,
-                radioOne: ConnectionStatus.IDDLE,
-                radioTwo: ConnectionStatus.IDDLE,
-                radioThree: ConnectionStatus.IDDLE
+                monitor: ConnectionStatus.IDLE,
+                radioOne: ConnectionStatus.IDLE,
+                radioTwo: ConnectionStatus.IDLE,
+                radioThree: ConnectionStatus.IDLE
             },
             setConnectionsStatus: (data: Partial<PersistedStoreProps['connectionsStatus']>) => set(state => ({ connectionsStatus: { ...state.connectionsStatus, ...data } })),
             directConnection: false,
@@ -62,10 +62,10 @@ type StoreProps = {
 export const useStore = create<StoreProps>(
     (set) => ({
         connectionsStatus: {
-            monitor: ConnectionStatus.IDDLE,
-            radioOne: ConnectionStatus.IDDLE,
-            radioTwo: ConnectionStatus.IDDLE,
-            radioThree: ConnectionStatus.IDDLE
+            monitor: ConnectionStatus.IDLE,
+            radioOne: ConnectionStatus.IDLE,
+            radioTwo: ConnectionStatus.IDLE,
+            radioThree: ConnectionStatus.IDLE
         },
         setConnectionsStatus: (data: Partial<StoreProps['connectionsStatus']>) => set(state => ({ connectionsStatus: { ...state.connectionsStatus, ...data } })),
     })
